@@ -99,3 +99,5 @@ summary(m)
 
 # 3 column format for Z
 Z_3col<-as.data.frame(summary(Z))
+colnames(Z_3col) <- NULL
+write.csv(Z_3col,file="Z_3col.csv",row.names=FALSE)
