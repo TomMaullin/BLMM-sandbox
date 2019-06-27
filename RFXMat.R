@@ -3,22 +3,22 @@ library(Matrix)
 library(lme4)
 
 # Say 20 subs, 5 readings each
-fS <- gl(20, 5000)
+fS <- gl(20, 50)
 JS <- t(as(fS, Class = "sparseMatrix"))
 num_s <- 5
 
 # Random intercept and random readings as RFX
-XS <- cbind(1,20*rnorm(100000))
+XS <- cbind(1,20*rnorm(1000))
 
 # Generate random effects matrix for subject factor
 ZS <- t(KhatriRao(t(JS), t(XS)))
 
 # Say 3 sites/groups, subjects randomly scanned at
-fG <- as.factor(sample(c(1:3),100000,replace=TRUE))
+fG <- as.factor(sample(c(1:3),1000,replace=TRUE))
 JG <- t(as(fG, Class = "sparseMatrix"))
 
 # Random intercept and random readings as RFX
-XG <- cbind(1,10*rnorm(100000))
+XG <- cbind(1,10*rnorm(1000))
 num_g <- 2
 
 # Generate random effects matrix for group factor
@@ -36,7 +36,7 @@ image(t(Z)%*%Z)
 #image(t(Z[11:20,])%*%Z[11:20,])
 
 # Fixed effects matrix
-X <- cbind(1, rnorm(100000), rnorm(100000))
+X <- cbind(1, rnorm(1000), rnorm(1000))
 
 # Make RFX variance matrix
 
@@ -65,7 +65,7 @@ b <- mvrnorm(n = 1, matrix(0L, nrow = dim(Z)[2], ncol = 1), sigma, tol = 1e-6, e
 beta <- c(1:3)
 
 # Generate response 
-y <- X%*%beta + Z%*%b + rnorm(100000)
+y <- X%*%beta + Z%*%b + rnorm(1000)
 
 #------------------------------------------------------------------------------------------------
 # Now to see if lmer can decipher this model
@@ -96,3 +96,6 @@ print(cov_s)
 print(cov_g)
 
 summary(m)
+
+# 3 column format for Z
+Z_3col<-as.data.frame(summary(Z))
