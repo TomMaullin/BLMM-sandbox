@@ -83,7 +83,7 @@ print(beta)
 ranef(m)
 print(t(matrix(b, 2, 23)))
 
-# RFX variances
+# RFX variances 
 as.matrix(Matrix::bdiag(VarCorr(m)))
 print(cov_s)
 print(cov_g)
@@ -93,4 +93,31 @@ summary(m)
 # 3 column format for Z
 Z_3col<-as.data.frame(summary(Z))
 colnames(Z_3col) <- NULL
-write.csv(Z_3col,file="Z_3col.csv",row.names=FALSE)
+sigma_3col<-as.data.frame(summary(sigma))
+colnames(sigma_3col) <- NULL
+true_rfx <- data.frame(t(matrix(b, 2, 23)))
+colnames(true_rfx) <- NULL
+write.csv(Z_3col,file="./testdata/Z_3col.csv",row.names=FALSE)
+write.csv(X,file="./testdata/X.csv",row.names=FALSE)
+write.csv(y,file="./testdata/Y.csv",row.names=FALSE)
+write.csv(beta,file="./testdata/true_beta.csv",row.names=FALSE)
+write.csv(sigma_3col,file="./testdata/true_rfxvar_3col.csv",row.names=FALSE)
+write.csv(c(1),file="./testdata/true_ffxvar.csv",row.names=FALSE)
+write.csv(true_rfx,file="./testdata/true_b.csv",row.names=FALSE)
+
+# Save the estimates as well
+rfx_1<-ranef(m)$fS
+rfx_2<-ranef(m)$fG
+colnames(rfx_1) <- ''
+colnames(rfx_2) <- ''
+est_rfx <- rbind(rfx_1,rfx_2)
+colnames(est_rfx) <- NULL
+write.csv(est_rfx,file="./testdata/estd_b.csv",row.names=FALSE)
+
+rfxvar_est <- data.frame(as.matrix(Matrix::bdiag(VarCorr(m))))
+colnames(rfxvar_est) <- NULL
+write.csv(rfxvar_est,file="./testdata/estd_rfxvar.csv",row.names=FALSE)
+
+est_ffx <- fixef(m)
+colnames(est_ffx) <- NULL
+write.csv(est_ffx,file="./testdata/estd_beta.csv",row.names=FALSE)
