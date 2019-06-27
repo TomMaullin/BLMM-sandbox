@@ -39,15 +39,8 @@ image(t(Z)%*%Z)
 X <- cbind(1, rnorm(1000), rnorm(1000))
 
 # Make RFX variance matrix
-
-# function for positive definite matrix
-# For subject rfx
-p <- qr.Q(qr(matrix(rnorm(2^2), 2)))
-cov_s <- crossprod(p, p*(2:1))
-
-# For group rfx
-p <- qr.Q(qr(matrix(rnorm(2^2), 2)))
-cov_g <- crossprod(p, p*(2:1))
+cov_s <- matrix(c(2,0.5,0.5,4),nrow=2,ncol=2)
+cov_g <- matrix(c(6,0.1,0.1,1),nrow=2,ncol=2)
 
 # Combine to get sparse block diag
 sigma <- cov_s
