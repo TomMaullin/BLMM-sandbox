@@ -93,17 +93,30 @@ summary(m)
 # 3 column format for Z
 Z_3col<-as.data.frame(summary(Z))
 colnames(Z_3col) <- NULL
+write.csv(Z_3col,file="./testdata/Z_3col.csv",row.names=FALSE)
+
 sigma_3col<-as.data.frame(summary(sigma))
 colnames(sigma_3col) <- NULL
-true_rfx <- data.frame(t(matrix(b, 2, 23)))
-colnames(true_rfx) <- NULL
-write.csv(Z_3col,file="./testdata/Z_3col.csv",row.names=FALSE)
-write.csv(X,file="./testdata/X.csv",row.names=FALSE)
-write.csv(y,file="./testdata/Y.csv",row.names=FALSE)
-write.csv(beta,file="./testdata/true_beta.csv",row.names=FALSE)
 write.csv(sigma_3col,file="./testdata/true_rfxvar_3col.csv",row.names=FALSE)
-write.csv(c(1),file="./testdata/true_ffxvar.csv",row.names=FALSE)
+
+X <- as.data.frame(X)
+colnames(X)<-NULL
+write.csv(X,file="./testdata/X.csv",row.names=FALSE)
+
+Y <- as.data.frame(Y)
+colnames(Y)<-NULL
+write.csv(y,file="./testdata/Y.csv",row.names=FALSE)
+
+beta <- as.data.frame(beta)
+colnames(beta)<-NULL
+write.csv(beta,file="./testdata/true_beta.csv",row.names=FALSE)
+
+
+true_rfx <- data.frame(b)
+colnames(true_rfx) <- NULL
 write.csv(true_rfx,file="./testdata/true_b.csv",row.names=FALSE)
+
+write.csv(c(1),file="./testdata/true_ffxvar.csv",row.names=FALSE)
 
 # Save the estimates as well
 rfx_1<-ranef(m)$fS
@@ -118,6 +131,6 @@ rfxvar_est <- data.frame(as.matrix(Matrix::bdiag(VarCorr(m))))
 colnames(rfxvar_est) <- NULL
 write.csv(rfxvar_est,file="./testdata/estd_rfxvar.csv",row.names=FALSE)
 
-est_ffx <- fixef(m)
+est_ffx <- data.frame(fixef(m))
 colnames(est_ffx) <- NULL
 write.csv(est_ffx,file="./testdata/estd_beta.csv",row.names=FALSE)
