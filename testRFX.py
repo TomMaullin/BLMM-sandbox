@@ -54,4 +54,23 @@ col = coltmp.reshape(coltmp.shape[0]*coltmp.shape[1])
 
 data = np.concatenate((z1_f2,z2_f2),axis=1).reshape(f2_nv*N)
 Z2 = sparse.csr_matrix((data, (row, col)), shape=(N, f2_nl*f2_nv))
-np.savetxt('tmp.txt', Z2.toarray(), fmt='%.1f')
+#np.savetxt('tmp.txt', Z2.toarray(), fmt='%.1f')
+
+Z = sparse.hstack([Z1,Z2])
+
+# Generate positive semidefinite matrix for factor 1 covariance
+random = np.random.rand(f1_nv, f1_nv)
+sigma1 = np.dot(random, random.transpose())
+
+# Generate positive semidefinite matrix for factor 2 covariance
+random = np.random.rand(f2_nv, f2_nv)
+sigma2 = np.dot(random, random.transpose())
+
+# Make the sparse matrices
+sigma1_full=sparse.kron(sparse.identity(f1_nl), sigma1)
+sigma2_full=sparse.kron(sparse.identity(f2_nl), sigma2)
+
+# Full sigma matrix
+sigma=sparse.block_diag((sigma1_full,sigma2_full))
+
+# Generate response 
