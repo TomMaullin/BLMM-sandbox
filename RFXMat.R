@@ -103,8 +103,8 @@ X <- as.data.frame(X)
 colnames(X)<-NULL
 write.csv(X,file="./testdata/X.csv",row.names=FALSE)
 
-Y <- as.data.frame(Y)
-colnames(Y)<-NULL
+y <- as.data.frame(y)
+colnames(y)<-NULL
 write.csv(y,file="./testdata/Y.csv",row.names=FALSE)
 
 beta <- as.data.frame(beta)
