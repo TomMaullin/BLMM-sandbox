@@ -116,7 +116,9 @@ true_rfx <- data.frame(b)
 colnames(true_rfx) <- NULL
 write.csv(true_rfx,file="./testdata/true_b.csv",row.names=FALSE)
 
-write.csv(c(1),file="./testdata/true_ffxvar.csv",row.names=FALSE)
+true_ffxvar <- data.frame(c(1))
+colnames(true_ffxvar) <- NULL
+write.csv(true_ffxvar,file="./testdata/true_ffxvar.csv",row.names=FALSE)
 
 # Save the estimates as well
 rfx_1<-ranef(m)$fS
