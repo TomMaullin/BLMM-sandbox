@@ -28,7 +28,7 @@ f2_nv=2
 q=f1_nl*f1_nv+f2_nl*f2_nv
 
 # Go to test data directory
-os.chdir('/home/tommaullin/BLMM-sandbox/testdata')
+os.chdir('/home/tommaullin/Documents/BLMM-sandbox/testdata')
 
 # Read in beta
 beta=pandas.read_csv('true_beta.csv',header=None).values
