@@ -146,7 +146,79 @@ def sparse_chol(M):
     # Return P and L
     return(P,L)
     
+# Z matrix generation function
+# ----------------------------------------------
+# This function takes in a dense matrix of
+# parameters, a list of factors and a matrix of
+# levels for said factors and generates the
+# sparse rfx matrix Z.
+# ----------------------------------------------
+# The following inputs are required for this
+# function:
+#
+# - params: These are the parameter columns that
+#           will form the non-zero elements of Z.
+# - factors: These are the grouping factors that
+#            will be used for creating Z.
+# - levels: This is a matrix of levels for
+#           creating Z.
+# ----------------------------------------------
+# Example:
+#
+#    In R language the following model:
+#
+#        y ~ ffx + (rfx1|factor2) + ...
+#               (rfx2|factor1) + (rfx3|factor3)
+#
+#    Would correspond to the following input
+#    parameters:
+#
+#    - params = [ rfx1 | rfx2 | rfx3 ]
+#    - factors = [2 1 3]
+#    - levels = [ factor1 | factor2 | factor3 ]
+def generate_Z(params,factors,levels):
 
+    # TODO
+    return(-1)
+
+# PLS function
+# ----------------------------------------------
+# This function performs PLS to obtain the
+# log likelihood value for parameter vector
+# theta.
+# ----------------------------------------------
+# The following inputs are required for this
+# function:
+#
+# - theta: The parameter estimate.
+# - X: The fixed effects design matrix.
+# - Z: The random effects design matrix.
+# - Lambda: The lower cholesky factor of the
+#           variance.
+# - P: The sparse permutation for
+#      Lamda'Z'ZLambda+I
+# - nlevels: a vector of the number of levels
+#            for each rfx grouping factor. e.g.
+#            nlevels=[10,2] means there are 
+#            10 levels for factor 1 and 2
+#            levels for factor 2.
+# - nparams: a vector of the number of rfx
+#            variables for each grouping factor.
+#            e.g. nlevels=[3,4] means there  
+#            are 3 variables for factor 1 and 4
+#            variables for factor 2.
+def PLS(theta, X, Y, Z, Lambda, P, nlevels, nparams):
+
+    # Obtain Lambda from theta
+    Lambda = mapping(theta, nlevels, nparams)
+
+    # Obtain Lambda'Z'Y
+    LambdatZt = spmatrix.trans(Lambda)*spmatrix.trans(Z)
+    LambdatZtY = LambdatZt*Y
+
+    # Obtain L
+    #~, L = sparse_chol(LambdatZtZLambda+I, perm=P) # Add perm and output options (E.g. F) to sparse_chol
+    
     
 
 # Examples
@@ -160,9 +232,10 @@ print(inv_mapping(l)==theta)
 os.chdir('/home/tommaullin/Documents/BLMM-sandbox/testdata')
 
 # Read in random effects variances
-D_3col=pd.read_csv('true_rfxvar_3col.csv',header=None).values
-D = cvxopt.spmatrix(D_3col[:,2].tolist(), (D_3col[:,0]-1).astype(np.int64), (D_3col[:,1]-1).astype(np.int64))
-
-P,L = sparse_chol(D)
+Z_3col=pd.read_csv('Z_3col.csv',header=None).values
+Z = cvxopt.spmatrix(Z_3col[:,2].tolist(), (Z_3col[:,0]-1).astype(np.int64), (Z_3col[:,1]-1).astype(np.int64))
+ZtZ=cvxopt.spmatrix.trans(Z)*Z
+P,L = sparse_chol(ZtZ)
 LLt=L*cvxopt.spmatrix.trans(L)
-print(LLt-D[P,P])
+print(LLt-ZtZ[P,P])
+print(sum(LLt-ZtZ[P,P]))
