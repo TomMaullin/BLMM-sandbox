@@ -284,15 +284,20 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     # BETAHAT WORKS!!!
 
     # below doesnt...
-    # Obtain u estimates
+    # Obtain L'P
+    Pinv = matrix(np.array(P).reshape(46), tc='i')
+    LtP = spmatrix.trans(L)[Pinv,:]
+
+    # Obtain b estimates (linsolve also overwrites the
+    # second argument)
     uhat = Cu-RZX*betahat
-    cholmod.solve(F,uhat,sys=8)
-    cholmod.solve(F,uhat,sys=5)
+    umfpack.linsolve(LtP, uhat)
+    
 
     # Obtain b estimates
-    bhat = spmatrix.trans(Lambda)*uhat
+    bhat = Lambda*uhat
 
-    return(betahat, bhat)
+    return(betahat, bhat, Cu, betahat, RZX, RXtRX)
     
 
 # Examples
@@ -343,4 +348,4 @@ P = f['P']
 
 Y=matrix(pd.read_csv('Y.csv',header=None).values)
 X=matrix(pd.read_csv('X.csv',header=None).values)
-betahat, bhat =PLS(theta,X,Y,Z,P,nlevels,nparams)
+betahat, bhat, Cu, betahat, RZX, RXtRX =PLS(theta,X,Y,Z,P,nlevels,nparams)
