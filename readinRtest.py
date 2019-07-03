@@ -55,25 +55,25 @@ X=pandas.read_csv('X.csv',header=None).values
 # Read in b
 b=pandas.read_csv('true_b.csv',header=None).values
 
-
-print(D)
 # Read in Y
 Y=pandas.read_csv('Y.csv',header=None).values
 
 # Read in ffx variance
 sigma2=pandas.read_csv('true_ffxvar.csv',header=None).values
 
+ZtZ=cvxopt.spmatrix.trans(Z2)*Z2
+
 # Use minimum degree ordering
-P=amd.order(D)
+P=amd.order(ZtZ)
 
 # Set the factorisation to use LL' instead of LDL'
 cholmod.options['supernodal']=2
 
 # Make an expression for the factorisation
-F=cholmod.symbolic(D,p=P)
+F=cholmod.symbolic(ZtZ,p=P)
 
 # Calculate the factorisation
-cholmod.numeric(D, F) 
+cholmod.numeric(ZtZ, F) 
 
 # Get the sparse cholesky factorisation
 L=cholmod.getfactor(F)
@@ -111,3 +111,24 @@ theta_repeated = np.hstack((np.tile(theta[0:f1_n_lamcomps], f1_nl),np.tile(theta
 lambda_theta = cvxopt.spmatrix(theta_repeated.tolist(), np.hstack((r_inds_f1,r_inds_f2)).astype(np.int64), np.hstack((c_inds_f1,c_inds_f2)).astype(np.int64))
 
 theta_fromlambda = pd.unique(list(lambda_theta))
+
+# Set the factorisation to use LL' instead of LDL'
+cholmod.options['supernodal']=2
+
+# Make an expression for the factorisation
+F=cholmod.symbolic(ZtZ)
+
+# Calculate the factorisation
+cholmod.numeric(ZtZ, F) 
+
+# Work out the permutation
+p = cvxopt.matrix(range(ZtZ.size[0]), (ZtZ.size[0],1), tc='d')
+cholmod.solve(F, p, sys=7)
+
+# Get the sparse cholesky factorisation
+L=cholmod.getfactor(F)
+LLt2=L*cvxopt.spmatrix.trans(L)
+
+p=cvxopt.matrix(np.array(p).astype(np.int64),tc='i')
+print(LLt2-ZtZ[p,p])
+#print(LLt-ZtZ[P,P])

@@ -1,8 +1,10 @@
 import numpy as np
 import cvxopt
-from cvxopt import cholmod, umfpack, amd
+from cvxopt import cholmod, umfpack, amd, matrix, spmatrix
 import time
 import pandas as pd
+###
+import os
 
 # Mapping function
 # ----------------------------------------------
@@ -75,7 +77,7 @@ def mapping(theta, nlevels, nparams):
             block_index = block_index + nparams[i]
             
     # Create lambda as a sparse matrix
-    lambda_theta = cvxopt.spmatrix(theta_repeated.tolist(), row_indices.astype(np.int64), col_indices.astype(np.int64))
+    lambda_theta = spmatrix(theta_repeated.tolist(), row_indices.astype(np.int64), col_indices.astype(np.int64))
 
     # Return lambda
     return(lambda_theta)
@@ -99,9 +101,68 @@ def inv_mapping(Lambda):
     theta = pd.unique(list(cvxopt.spmatrix.trans(Lambda)))
     return(theta)
 
+# Sparse Cholesky Decomposition function
+# ----------------------------------------------
+# This function takes in a square matrix M and
+# outputs P and L from it's sparse cholesky
+# decomposition of the form PAP'=LL'.
+#
+# Note: P is given as a permutation vector
+# rather than a matrix.
+# ----------------------------------------------
+# The following inputs are required for this
+# function:
+#
+# - M: The matrix to be sparse cholesky
+#      decomposed as an spmatrix from the
+#      cvxopt package.
+def sparse_chol(M):
+
+    # Quick check that M is square
+    if M.size[0]!=M.size[1]:
+        raise Exception('M must be square.')
+
+    # Set the factorisation to use LL' instead of LDL'
+    cholmod.options['supernodal']=2
+
+    # Make an expression for the factorisation
+    F=cholmod.symbolic(M)
+
+    # Calculate the factorisation
+    cholmod.numeric(M, F) 
+
+    # Set p to [0,...,n-1]
+    P = cvxopt.matrix(range(M.size[0]), (M.size[0],1), tc='d')
+
+    # Solve and replace p with the true permutation used
+    cholmod.solve(F, P, sys=7)
+
+    # Convert p into an integer array; more useful that way
+    P=cvxopt.matrix(np.array(P).astype(np.int64),tc='i')
+
+    # Get the sparse cholesky factor
+    L=cholmod.getfactor(F)
+
+    # Return P and L
+    return(P,L)
+    
+
+    
+
 # Examples
 nparams = np.array([9,6,12,3,2,1])
 nlevels = np.array([10,3,9,3,2,6])
 theta = np.random.randn((np.sum(np.multiply(nparams,(nparams+1))/2)).astype(np.int64))
 l=mapping(theta, nlevels, nparams)
 print(inv_mapping(l)==theta)
+
+# Go to test data directory
+os.chdir('/home/tommaullin/Documents/BLMM-sandbox/testdata')
+
+# Read in random effects variances
+D_3col=pd.read_csv('true_rfxvar_3col.csv',header=None).values
+D = cvxopt.spmatrix(D_3col[:,2].tolist(), (D_3col[:,0]-1).astype(np.int64), (D_3col[:,1]-1).astype(np.int64))
+
+P,L = sparse_chol(D)
+LLt=L*cvxopt.spmatrix.trans(L)
+print(LLt-D[P,P])
