@@ -1,10 +1,11 @@
 import numpy as np
 import cvxopt
-from cvxopt import cholmod, umfpack, amd, matrix, spmatrix
-import time
+from cvxopt import cholmod, umfpack, amd, matrix, spmatrix, lapack
 import pandas as pd
 ###
 import os
+import time
+import numba
 
 # Mapping function
 # ----------------------------------------------
@@ -92,7 +93,7 @@ def mapping(theta, nlevels, nparams):
 # function:
 #
 # - Lambda: The sparse lower triangular block
-#           diagonal matrix. 
+#           diagonal matrix.
 def inv_mapping(Lambda):
 
     # List the unique elements of lambda (in the
@@ -116,7 +117,12 @@ def inv_mapping(Lambda):
 # - M: The matrix to be sparse cholesky
 #      decomposed as an spmatrix from the
 #      cvxopt package.
-def sparse_chol(M):
+# - perm: Input permutation (optional, one will be calculated if not)
+# - retF: Return the factorisation object or not
+# - retP: Return the permutation or not
+# - retL: Return the lower cholesky or not
+#
+def sparse_chol(M, perm=None, retF=False, retP=True, retL=True):
 
     # Quick check that M is square
     if M.size[0]!=M.size[1]:
@@ -125,26 +131,53 @@ def sparse_chol(M):
     # Set the factorisation to use LL' instead of LDL'
     cholmod.options['supernodal']=2
 
-    # Make an expression for the factorisation
-    F=cholmod.symbolic(M)
+    if not perm is None:
+        # Make an expression for the factorisation
+        F=cholmod.symbolic(M,p=perm)
+    else:
+        # Make an expression for the factorisation
+        F=cholmod.symbolic(M)
 
     # Calculate the factorisation
-    cholmod.numeric(M, F) 
+    cholmod.numeric(M, F)
 
-    # Set p to [0,...,n-1]
-    P = cvxopt.matrix(range(M.size[0]), (M.size[0],1), tc='d')
+    # Empty factorisation object
+    factorisation = {}
 
-    # Solve and replace p with the true permutation used
-    cholmod.solve(F, P, sys=7)
+    if retF:
 
-    # Convert p into an integer array; more useful that way
-    P=cvxopt.matrix(np.array(P).astype(np.int64),tc='i')
+        # Calculate the factorisation again (buggy if returning L for
+        # some reason)
+        F2=cholmod.symbolic(M,p=perm)
+        cholmod.numeric(M, F2)
 
-    # Get the sparse cholesky factor
-    L=cholmod.getfactor(F)
+        # If we want to return the F object, add it to the dictionary
+        factorisation['F']=F2
+
+    if retP:
+
+        # Set p to [0,...,n-1]
+        P = cvxopt.matrix(range(M.size[0]), (M.size[0],1), tc='d')
+
+        # Solve and replace p with the true permutation used
+        cholmod.solve(F, P, sys=7)
+
+        # Convert p into an integer array; more useful that way
+        P=cvxopt.matrix(np.array(P).astype(np.int64),tc='i')
+
+        # If we want to return the permutation, add it to the dictionary
+        factorisation['P']=P
+
+    if retL:
+
+        # Get the sparse cholesky factor
+        L=cholmod.getfactor(F)
+        
+        # If we want to return the factor, add it to the dictionary
+        factorisation['L']=L
 
     # Return P and L
-    return(P,L)
+    return(factorisation)
     
 # Z matrix generation function
 # ----------------------------------------------
@@ -207,18 +240,59 @@ def generate_Z(params,factors,levels):
 #            e.g. nlevels=[3,4] means there  
 #            are 3 variables for factor 1 and 4
 #            variables for factor 2.
-def PLS(theta, X, Y, Z, Lambda, P, nlevels, nparams):
+def PLS(theta, X, Y, Z, P, nlevels, nparams):
 
     # Obtain Lambda from theta
     Lambda = mapping(theta, nlevels, nparams)
 
-    # Obtain Lambda'Z'Y
+    # Obtain Lambda'Z'Y and Lambda'Z'X
     LambdatZt = spmatrix.trans(Lambda)*spmatrix.trans(Z)
     LambdatZtY = LambdatZt*Y
+    LambdatZtX = LambdatZt*X
 
     # Obtain L
-    #~, L = sparse_chol(LambdatZtZLambda+I, perm=P) # Add perm and output options (E.g. F) to sparse_chol
+    LambdatZtZLambda = LambdatZt*spmatrix.trans(LambdatZt)
+    I = spmatrix(1.0, range(Lambda.size[0]), range(Lambda.size[0]))
+    chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True)
+    L = chol_dict['L']
+    F = chol_dict['F']
+
+    # Obtain C_u (annoyingly solve writes over the second argument,
+    # whereas spsolve outputs)
+    Cu = LambdatZtY[P,:]
+    cholmod.solve(F,Cu,sys=4)
+
+    # Obtain RZX
+    RZX = LambdatZtX[P,:]
+    cholmod.solve(F,RZX,sys=4)
+
+    # Obtain RXtRX
+    RXtRX = matrix.trans(X)*X - matrix.trans(RZX)*RZX
+
+    print(RXtRX.size)
+    print(X.size)
+    print(Y.size)
+    print(RZX.size)
+    print(Cu.size)
     
+
+    # Obtain beta estimates (note: gesv also replaces the second
+    # argument)
+    betahat = matrix.trans(X)*Y - matrix.trans(RZX)*Cu
+    lapack.gesv(RXtRX, betahat)
+
+    # BETAHAT WORKS!!!
+
+    # below doesnt...
+    # Obtain u estimates
+    uhat = Cu-RZX*betahat
+    cholmod.solve(F,uhat,sys=8)
+    cholmod.solve(F,uhat,sys=5)
+
+    # Obtain b estimates
+    bhat = spmatrix.trans(Lambda)*uhat
+
+    return(betahat, bhat)
     
 
 # Examples
@@ -235,7 +309,38 @@ os.chdir('/home/tommaullin/Documents/BLMM-sandbox/testdata')
 Z_3col=pd.read_csv('Z_3col.csv',header=None).values
 Z = cvxopt.spmatrix(Z_3col[:,2].tolist(), (Z_3col[:,0]-1).astype(np.int64), (Z_3col[:,1]-1).astype(np.int64))
 ZtZ=cvxopt.spmatrix.trans(Z)*Z
-P,L = sparse_chol(ZtZ)
-LLt=L*cvxopt.spmatrix.trans(L)
-print(LLt-ZtZ[P,P])
-print(sum(LLt-ZtZ[P,P]))
+f = sparse_chol(ZtZ)
+LLt=f['L']*cvxopt.spmatrix.trans(f['L'])
+print(LLt-ZtZ[f['P'],f['P']])
+print(sum(LLt-ZtZ[f['P'],f['P']]))
+
+t1 = time.time()
+sparse_chol(ZtZ)
+t2 = time.time()
+print(t2-t1)
+t1 = time.time()
+sparse_chol(ZtZ,perm=f['P'])
+t2 = time.time()
+print(t2-t1)
+
+# Calculate lambda for R example
+tmp =pd.read_csv('estd_rfxvar.csv',header=None).values
+rfxvarest = spmatrix(tmp[tmp!=0],[0,0,1,1,2,2,3,3],[0,1,0,1,2,3,2,3])
+f = sparse_chol(rfxvarest)
+theta = inv_mapping(f['L'])
+
+nlevels = np.array([20,3])
+nparams = np.array([2,2])
+Lam=mapping(theta, nlevels, nparams)
+cvxopt.printing.options['width'] = -1
+
+# Obtaining permutation for PLS
+# Obtain Lambda'Z'ZLambda
+LamtZt = spmatrix.trans(Lam)*spmatrix.trans(Z)
+LamtZtZLam = LamtZt*spmatrix.trans(LamtZt)
+f=sparse_chol(LamtZtZLam)
+P = f['P']
+
+Y=matrix(pd.read_csv('Y.csv',header=None).values)
+X=matrix(pd.read_csv('X.csv',header=None).values)
+betahat, bhat =PLS(theta,X,Y,Z,P,nlevels,nparams)
