@@ -102,6 +102,37 @@ def inv_mapping(Lambda):
     theta = pd.unique(list(cvxopt.spmatrix.trans(Lambda)))
     return(theta)
 
+# Sparse symmetric determinant
+# ----------------------------------------------
+# This function takes in a square symmetric
+# matrix M and outputs it's determinant
+# ----------------------------------------------
+# The following inputs are required for this
+# function:
+#
+# - M: A sparse symmetric matrix
+#
+# Note: THIS DOES NOT WORK FOR NON-SYMMETRIC M
+def sp_det_sym(M):
+
+    # Change to the LL' decomposition
+    prevopts = cholmod.options['supernodal']
+    cholmod.options['supernodal'] = 2
+
+    # Obtain decomposition of M
+    F = cholmod.symbolic(M)
+    cholmod.numeric(M, F)
+
+    # Restore previous options
+    cholmod.options['supernodal'] = prevopts
+
+    # As PMP'=LL' and det(P)=1 for all permutations
+    # it follows det(M)=det(L)^2=product(diag(L))^2
+    return(np.exp(2*sum(cvxopt.log(cholmod.diag(F)))))
+    
+
+    
+
 # Sparse Cholesky Decomposition function
 # ----------------------------------------------
 # This function takes in a square matrix M and
@@ -250,6 +281,9 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     LambdatZtY = LambdatZt*Y
     LambdatZtX = LambdatZt*X
 
+    # Set the factorisation to use LL' instead of LDL'
+    cholmod.options['supernodal']=2
+
     # Obtain L
     LambdatZtZLambda = LambdatZt*spmatrix.trans(LambdatZt)
     I = spmatrix(1.0, range(Lambda.size[0]), range(Lambda.size[0]))
@@ -281,23 +315,29 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     betahat = matrix.trans(X)*Y - matrix.trans(RZX)*Cu
     lapack.gesv(RXtRX, betahat)
 
-    # BETAHAT WORKS!!!
-
-    # below doesnt...
-    # Obtain L'P
-    Pinv = matrix(np.array(P).reshape(46), tc='i')
-    LtP = spmatrix.trans(L)[Pinv,:]
-
-    # Obtain b estimates (linsolve also overwrites the
-    # second argument)
+    # Obtain u estimates
     uhat = Cu-RZX*betahat
-    umfpack.linsolve(LtP, uhat)
-    
+    cholmod.solve(F,uhat,sys=5)
+    cholmod.solve(F,uhat,sys=8)
 
     # Obtain b estimates
     bhat = Lambda*uhat
 
-    return(betahat, bhat, Cu, betahat, RZX, RXtRX)
+    # Obtain y estimates
+    Yhat = X*betahat + Z*bhat
+
+    # Obtain residuals
+    res = Y - Yhat
+
+    # Obtain penalised residual sum of squares
+    pss = matrix.trans(res)*res + matrix.trans(uhat)*uhat
+
+    # Obtain Log(|L|^2)
+    detlog = 2*sum(cvxopt.log(cholmod.diag(F))) # Need to do tr(R_X)^2 for rml
+
+
+
+    return(betahat, bhat, Yhat, res, detlog)
     
 
 # Examples
@@ -348,4 +388,19 @@ P = f['P']
 
 Y=matrix(pd.read_csv('Y.csv',header=None).values)
 X=matrix(pd.read_csv('X.csv',header=None).values)
-betahat, bhat, Cu, betahat, RZX, RXtRX =PLS(theta,X,Y,Z,P,nlevels,nparams)
+t1 = time.time()
+betahat, bhat, yhat, res,detlog =PLS(theta,X,Y,Z,P,nlevels,nparams)
+t2 = time.time()
+
+print(t1-t2)
+
+# Determinant check
+V = [10, 3, 5, -2, 5, 8,3,-2,3,3]
+I = [0, 2, 1, 3, 2, 3,3,1,0,2]
+J = [0, 0, 1, 1, 2, 3,2,3,2,3]
+A = spmatrix(V,I,J)
+A2 = np.zeros([4,4])
+A2[I,J]=V
+print(np.linalg.det(A2))
+print(sp_det_sym(A))
+print(detlog)
