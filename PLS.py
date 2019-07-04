@@ -333,7 +333,7 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     pss = matrix.trans(res)*res + matrix.trans(uhat)*uhat
 
     # Obtain Log(|L|^2)
-    detlog = 2*sum(cvxopt.log(cholmod.diag(F))) # Need to do tr(R_X)^2 for rml
+    logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # Need to do tr(R_X)^2 for rml
 
 
 
