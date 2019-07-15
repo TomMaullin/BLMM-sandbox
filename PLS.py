@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import time
 import numba
+import sparse #All functions but the chol should be converted to use this
 
 # Mapping function
 # ----------------------------------------------
@@ -273,70 +274,156 @@ def generate_Z(params,factors,levels):
 #            variables for factor 2.
 def PLS(theta, X, Y, Z, P, nlevels, nparams):
 
+    t1 = time.time()
     # Obtain Lambda from theta
     Lambda = mapping(theta, nlevels, nparams)
+    t2 = time.time()
+    print(t2-t1)
 
+    t1 = time.time()
     # Obtain Lambda'Z'Y and Lambda'Z'X
     LambdatZt = spmatrix.trans(Lambda)*spmatrix.trans(Z)
-    LambdatZtY = LambdatZt*Y
-    LambdatZtX = LambdatZt*X
+    t2 = time.time()
+    print(t2-t1)
 
+    t1 = time.time()
+    LambdatZtY = LambdatZt*Y
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
+    LambdatZtX = LambdatZt*X
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     # Set the factorisation to use LL' instead of LDL'
     cholmod.options['supernodal']=2
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain L
+    t1 = time.time()
     LambdatZtZLambda = LambdatZt*spmatrix.trans(LambdatZt)
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     I = spmatrix(1.0, range(Lambda.size[0]), range(Lambda.size[0]))
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True)
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     L = chol_dict['L']
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     F = chol_dict['F']
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain C_u (annoyingly solve writes over the second argument,
     # whereas spsolve outputs)
+    t1 = time.time()
     Cu = LambdatZtY[P,:]
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     cholmod.solve(F,Cu,sys=4)
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain RZX
+    t1 = time.time()
     RZX = LambdatZtX[P,:]
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     cholmod.solve(F,RZX,sys=4)
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain RXtRX
+    t1 = time.time()
     RXtRX = matrix.trans(X)*X - matrix.trans(RZX)*RZX
+    t2 = time.time()
+    print(t2-t1)
 
-    print(RXtRX.size)
-    print(X.size)
-    print(Y.size)
-    print(RZX.size)
-    print(Cu.size)
+    #print(RXtRX.size)
+    #print(X.size)
+    #print(Y.size)
+    #print(RZX.size)
+    #print(Cu.size)
     
 
     # Obtain beta estimates (note: gesv also replaces the second
     # argument)
+    t1 = time.time()
     betahat = matrix.trans(X)*Y - matrix.trans(RZX)*Cu
+    t2 = time.time()
+    print(t2-t1)
+    
+    t1 = time.time()
     lapack.gesv(RXtRX, betahat)
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain u estimates
+    t1 = time.time()
     uhat = Cu-RZX*betahat
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     cholmod.solve(F,uhat,sys=5)
+    t2 = time.time()
+    print(t2-t1)
+
+    t1 = time.time()
     cholmod.solve(F,uhat,sys=8)
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain b estimates
+    t1 = time.time()
     bhat = Lambda*uhat
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain y estimates
+    t1 = time.time()
     Yhat = X*betahat + Z*bhat
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain residuals
+    t1 = time.time()
     res = Y - Yhat
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain penalised residual sum of squares
+    t1 = time.time()
     pss = matrix.trans(res)*res + matrix.trans(uhat)*uhat
+    t2 = time.time()
+    print(t2-t1)
 
     # Obtain Log(|L|^2)
+    t1 = time.time()
     logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # Need to do tr(R_X)^2 for rml
+    t2 = time.time()
+    print(t2-t1)
 
-    print(L[::(L.size[0]+1)]) # gives diag
-    print(L)
+    #print(L[::(L.size[0]+1)]) # gives diag
+    #print(L)
 
     return(betahat, bhat, Yhat, res, logdet)
     
@@ -346,7 +433,7 @@ nparams = np.array([9,6,12,3,2,1])
 nlevels = np.array([10,3,9,3,2,6])
 theta = np.random.randn((np.sum(np.multiply(nparams,(nparams+1))/2)).astype(np.int64))
 l=mapping(theta, nlevels, nparams)
-print(inv_mapping(l)==theta)
+#print(inv_mapping(l)==theta)
 
 # Go to test data directory
 os.chdir('/home/tommaullin/Documents/BLMM-sandbox/testdata')
@@ -357,17 +444,17 @@ Z = cvxopt.spmatrix(Z_3col[:,2].tolist(), (Z_3col[:,0]-1).astype(np.int64), (Z_3
 ZtZ=cvxopt.spmatrix.trans(Z)*Z
 f = sparse_chol(ZtZ)
 LLt=f['L']*cvxopt.spmatrix.trans(f['L'])
-print(LLt-ZtZ[f['P'],f['P']])
-print(sum(LLt-ZtZ[f['P'],f['P']]))
+#print(LLt-ZtZ[f['P'],f['P']])
+#print(sum(LLt-ZtZ[f['P'],f['P']]))
 
 t1 = time.time()
 sparse_chol(ZtZ)
 t2 = time.time()
-print(t2-t1)
+#print(t2-t1)
 t1 = time.time()
 sparse_chol(ZtZ,perm=f['P'])
 t2 = time.time()
-print(t2-t1)
+#print(t2-t1)
 
 # Calculate lambda for R example
 tmp =pd.read_csv('estd_rfxvar.csv',header=None).values
@@ -393,7 +480,7 @@ t1 = time.time()
 betahat, bhat, yhat, res, logdet =PLS(theta,X,Y,Z,P,nlevels,nparams)
 t2 = time.time()
 
-print(t1-t2)
+print(t2-t1)
 
 # Determinant check
 V = [10, 3, 5, -2, 5, 8,3,-2,3,3]
@@ -402,6 +489,6 @@ J = [0, 0, 1, 1, 2, 3,2,3,2,3]
 A = spmatrix(V,I,J)
 A2 = np.zeros([4,4])
 A2[I,J]=V
-print(np.linalg.det(A2))
-print(sp_det_sym(A))
-print(logdet)
+#print(np.linalg.det(A2))
+#print(sp_det_sym(A))
+#print(logdet)
