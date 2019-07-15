@@ -273,7 +273,7 @@ def generate_Z(params,factors,levels):
 #            e.g. nlevels=[3,4] means there  
 #            are 3 variables for factor 1 and 4
 #            variables for factor 2.
-def PLS(theta, X, Y, Z, P, nlevels, nparams):
+def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z, P, nlevels, nparams):
 
     t1 = time.time()
     # Obtain Lambda from theta
@@ -282,18 +282,18 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     #print(t2-t1)
 
     t1 = time.time()
-    # Obtain Lambda'Z'Y and Lambda'Z'X
-    LambdatZt = spmatrix.trans(Lambda)*spmatrix.trans(Z)
+    # Obtain Lambda'
+    Lambdat = spmatrix.trans(Lambda)
     t2 = time.time()
     #print(t2-t1)
 
     t1 = time.time()
-    LambdatZtY = LambdatZt*Y
+    LambdatZtY = Lambdat*ZtY
     t2 = time.time()
     #print(t2-t1)
 
     t1 = time.time()
-    LambdatZtX = LambdatZt*X
+    LambdatZtX = Lambdat*ZtX
     t2 = time.time()
     #print(t2-t1)
 
@@ -305,7 +305,7 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
 
     # Obtain L
     t1 = time.time()
-    LambdatZtZLambda = LambdatZt*spmatrix.trans(LambdatZt)
+    LambdatZtZLambda = Lambdat*ZtZ*Lambda
     t2 = time.time()
     #print(t2-t1)
 
@@ -354,7 +354,7 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
 
     # Obtain RXtRX
     t1 = time.time()
-    RXtRX = matrix.trans(X)*X - matrix.trans(RZX)*RZX
+    RXtRX = XtX - matrix.trans(RZX)*RZX
     t2 = time.time()
     #print(t2-t1)
 
@@ -368,7 +368,7 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     # Obtain beta estimates (note: gesv also replaces the second
     # argument)
     t1 = time.time()
-    betahat = matrix.trans(X)*Y - matrix.trans(RZX)*Cu
+    betahat = XtY - matrix.trans(RZX)*Cu
     t2 = time.time()
     #print(t2-t1)
     
@@ -425,13 +425,13 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     #print(t2-t1)
 
     # Obtain log likelihood
-    logllh = -logdet/2-X.size[0]*(1+np.log(2*np.pi*pss)-np.log(X.size[0]))
+    logllh = -logdet/2-X.size[0]/2*(1+np.log(2*np.pi*pss)-np.log(X.size[0]))
 
     #print(L[::(L.size[0]+1)]) # gives diag
-    print(logllh[0,0])
-    print(theta)
+    #print(logllh[0,0])
+    #print(theta)
 
-    return(logllh[0,0])
+    return(-logllh[0,0])
     
 
 # Examples
@@ -477,14 +477,23 @@ cvxopt.printing.options['width'] = -1
 # Obtain Lambda'Z'ZLambda
 LamtZt = spmatrix.trans(Lam)*spmatrix.trans(Z)
 LamtZtZLam = LamtZt*spmatrix.trans(LamtZt)
-f=sparse_chol(LamtZtZLam)
-P = f['P']
+#f=sparse_chol(LamtZtZLam)
+#P = f['P']
+P=cvxopt.amd.order(LamtZtZLam)
 
 Y=matrix(pd.read_csv('Y.csv',header=None).values)
 X=matrix(pd.read_csv('X.csv',header=None).values)
+
+ZtX=cvxopt.spmatrix.trans(Z)*X
+ZtY=cvxopt.spmatrix.trans(Z)*Y
+XtX=cvxopt.matrix.trans(X)*X
+ZtZ=cvxopt.spmatrix.trans(Z)*Z
+XtY=cvxopt.matrix.trans(X)*Y
 t1 = time.time()
-logllh =PLS(theta,X,Y,Z,P,nlevels,nparams)
+estllh =-PLS(theta,ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z,P,nlevels,nparams)
 t2 = time.time()
+
+truellh=matrix(pd.read_csv('./estd_ll.csv',header=None).values)[0]
 
 print(t2-t1)
 
@@ -502,7 +511,14 @@ A2[I,J]=V
 theta0=np.array([1,0,1,1,0,1])
 
 t1 = time.time()
-theta_est=minimize(PLS, theta0, args=(X,Y,Z,P,nlevels,nparams), method='Nelder-Mead', tol=1e-30)
+theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z,P,nlevels,nparams), method='Nelder-Mead', tol=1e-6)
+t2 = time.time()
+
+print(t2-t1)
+
+
+t1 = time.time()
+theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z,P,nlevels,nparams), method='Powell', tol=1e-6)
 t2 = time.time()
 
 print(t2-t1)
