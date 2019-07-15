@@ -335,9 +335,10 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     # Obtain Log(|L|^2)
     logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # Need to do tr(R_X)^2 for rml
 
+    print(L[::(L.size[0]+1)]) # gives diag
+    print(L)
 
-
-    return(betahat, bhat, Yhat, res, detlog)
+    return(betahat, bhat, Yhat, res, logdet)
     
 
 # Examples
@@ -389,7 +390,7 @@ P = f['P']
 Y=matrix(pd.read_csv('Y.csv',header=None).values)
 X=matrix(pd.read_csv('X.csv',header=None).values)
 t1 = time.time()
-betahat, bhat, yhat, res,detlog =PLS(theta,X,Y,Z,P,nlevels,nparams)
+betahat, bhat, yhat, res, logdet =PLS(theta,X,Y,Z,P,nlevels,nparams)
 t2 = time.time()
 
 print(t1-t2)
@@ -403,4 +404,4 @@ A2 = np.zeros([4,4])
 A2[I,J]=V
 print(np.linalg.det(A2))
 print(sp_det_sym(A))
-print(detlog)
+print(logdet)
