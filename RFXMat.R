@@ -73,7 +73,7 @@ z2 <- as.matrix(XS[,2])
 z3 <- as.matrix(XG[,1])
 z4 <- as.matrix(XG[,2])
 
-m <- lmer(y ~ x2 + x3 + (z2|fS) + (z4|fG)) #Don't need intercepts in R - automatically assumed
+m <- lmer(y ~ x2 + x3 + (z2|fS) + (z4|fG), REML=FALSE) #Don't need intercepts in R - automatically assumed
 
 # FFX estimates
 fixef(m)
@@ -136,3 +136,7 @@ write.csv(rfxvar_est,file="./testdata/estd_rfxvar.csv",row.names=FALSE)
 est_ffx <- data.frame(fixef(m))
 colnames(est_ffx) <- NULL
 write.csv(est_ffx,file="./testdata/estd_beta.csv",row.names=FALSE)
+
+est_ll <- data.frame(ll)
+colnames(est_ll) <- NULL
+write.csv(est_ll,file="./testdata/estd_ll.csv",row.names=FALSE)
