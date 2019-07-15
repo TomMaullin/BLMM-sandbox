@@ -2,6 +2,7 @@ import numpy as np
 import cvxopt
 from cvxopt import cholmod, umfpack, amd, matrix, spmatrix, lapack
 import pandas as pd
+from scipy.optimize import minimize
 ###
 import os
 import time
@@ -278,84 +279,84 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     # Obtain Lambda from theta
     Lambda = mapping(theta, nlevels, nparams)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     # Obtain Lambda'Z'Y and Lambda'Z'X
     LambdatZt = spmatrix.trans(Lambda)*spmatrix.trans(Z)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     LambdatZtY = LambdatZt*Y
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     LambdatZtX = LambdatZt*X
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     # Set the factorisation to use LL' instead of LDL'
     cholmod.options['supernodal']=2
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain L
     t1 = time.time()
     LambdatZtZLambda = LambdatZt*spmatrix.trans(LambdatZt)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     I = spmatrix(1.0, range(Lambda.size[0]), range(Lambda.size[0]))
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     L = chol_dict['L']
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     F = chol_dict['F']
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain C_u (annoyingly solve writes over the second argument,
     # whereas spsolve outputs)
     t1 = time.time()
     Cu = LambdatZtY[P,:]
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     cholmod.solve(F,Cu,sys=4)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain RZX
     t1 = time.time()
     RZX = LambdatZtX[P,:]
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     cholmod.solve(F,RZX,sys=4)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain RXtRX
     t1 = time.time()
     RXtRX = matrix.trans(X)*X - matrix.trans(RZX)*RZX
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     #print(RXtRX.size)
     #print(X.size)
@@ -369,63 +370,68 @@ def PLS(theta, X, Y, Z, P, nlevels, nparams):
     t1 = time.time()
     betahat = matrix.trans(X)*Y - matrix.trans(RZX)*Cu
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
     
     t1 = time.time()
     lapack.gesv(RXtRX, betahat)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain u estimates
     t1 = time.time()
     uhat = Cu-RZX*betahat
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     cholmod.solve(F,uhat,sys=5)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     t1 = time.time()
     cholmod.solve(F,uhat,sys=8)
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain b estimates
     t1 = time.time()
     bhat = Lambda*uhat
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain y estimates
     t1 = time.time()
     Yhat = X*betahat + Z*bhat
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain residuals
     t1 = time.time()
     res = Y - Yhat
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain penalised residual sum of squares
     t1 = time.time()
     pss = matrix.trans(res)*res + matrix.trans(uhat)*uhat
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
 
     # Obtain Log(|L|^2)
     t1 = time.time()
-    logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # Need to do tr(R_X)^2 for rml
+    logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # this method only works for symm decomps
+    # Need to do tr(R_X)^2 for rml
     t2 = time.time()
-    print(t2-t1)
+    #print(t2-t1)
+
+    # Obtain log likelihood
+    logllh = -logdet/2-X.size[0]*(1+np.log(2*np.pi*pss)-np.log(X.size[0]))
 
     #print(L[::(L.size[0]+1)]) # gives diag
-    #print(L)
+    print(logllh[0,0])
+    print(theta)
 
-    return(betahat, bhat, Yhat, res, logdet)
+    return(logllh[0,0])
     
 
 # Examples
@@ -477,7 +483,7 @@ P = f['P']
 Y=matrix(pd.read_csv('Y.csv',header=None).values)
 X=matrix(pd.read_csv('X.csv',header=None).values)
 t1 = time.time()
-betahat, bhat, yhat, res, logdet =PLS(theta,X,Y,Z,P,nlevels,nparams)
+logllh =PLS(theta,X,Y,Z,P,nlevels,nparams)
 t2 = time.time()
 
 print(t2-t1)
@@ -492,3 +498,11 @@ A2[I,J]=V
 #print(np.linalg.det(A2))
 #print(sp_det_sym(A))
 #print(logdet)
+
+theta0=np.array([1,0,1,1,0,1])
+
+t1 = time.time()
+theta_est=minimize(PLS, theta0, args=(X,Y,Z,P,nlevels,nparams), method='Nelder-Mead', tol=1e-30)
+t2 = time.time()
+
+print(t2-t1)
