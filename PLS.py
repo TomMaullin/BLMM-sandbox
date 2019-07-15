@@ -31,14 +31,14 @@ import sparse #All functions but the chol should be converted to use this
 #            variables for factor 2.
 #
 # All arrays must be np arrays.
-def mapping(theta, nlevels, nparams):
+def get_mapping(theta, nlevels, nparams):
 
     # Work out how many factors there are
     n_f = len(nlevels)
 
     # Quick check that nlevels and nparams are the same length
-    if len(nlevels)!=len(nparams):
-        raise Exception('The number of parameters and number of levels should be recorded for every grouping factor.')
+    #if len(nlevels)!=len(nparams):
+    #    raise Exception('The number of parameters and number of levels should be recorded for every grouping factor.')
 
     # Work out how many lambda components needed for each factor
     n_lamcomps = (np.multiply(nparams,(nparams+1))/2).astype(np.int64)
@@ -53,7 +53,7 @@ def mapping(theta, nlevels, nparams):
 
     # This will have the values of theta repeated several times, once
     # for each time each value of theta appears in lambda
-    theta_repeated = np.array([])
+    theta_repeated_inds = np.array([])
     
     # Loop through factors generating the indices to map theta to.
     for i in range(0,n_f):
@@ -63,7 +63,10 @@ def mapping(theta, nlevels, nparams):
         row_inds_tri, col_inds_tri = np.tril_indices(nparams[i])
 
         # Work out theta for this block
-        theta_current = theta[np.sum(n_lamcomps[0:i]):np.sum(n_lamcomps[0:(i+1)])]
+        theta_current_inds = np.arange(np.sum(n_lamcomps[0:i]),np.sum(n_lamcomps[0:(i+1)]))
+
+        # Work out the repeated theta
+        theta_repeated_inds = np.hstack((theta_repeated_inds, np.tile(theta_current_inds, nlevels[i])))
 
         # For each level of the factor we must repeat the lower
         # triangular matrix
@@ -73,17 +76,19 @@ def mapping(theta, nlevels, nparams):
             row_indices = np.hstack((row_indices, (row_inds_tri+block_index)))
             col_indices = np.hstack((col_indices, (col_inds_tri+block_index)))
 
-            # Repeat theta for every block
-            theta_repeated = np.hstack((theta_repeated, theta_current))
-
             # Move onto the next block
             block_index = block_index + nparams[i]
-            
+
     # Create lambda as a sparse matrix
-    lambda_theta = spmatrix(theta_repeated.tolist(), row_indices.astype(np.int64), col_indices.astype(np.int64))
+    #lambda_theta = spmatrix(theta_repeated.tolist(), row_indices.astype(np.int64), col_indices.astype(np.int64))
 
     # Return lambda
-    return(lambda_theta)
+    return(theta_repeated_inds, row_indices, col_indices)
+
+def mapping(theta, theta_inds, r_inds, c_inds):
+
+    return(spmatrix(theta[theta_inds.astype(np.int64)].tolist(), r_inds.astype(np.int64), c_inds.astype(np.int64)))
+    
 
 # Inverse mapping function
 # ----------------------------------------------
@@ -273,89 +278,89 @@ def generate_Z(params,factors,levels):
 #            e.g. nlevels=[3,4] means there  
 #            are 3 variables for factor 1 and 4
 #            variables for factor 2.
-def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z, P, nlevels, nparams):
+def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY, P, tinds, rinds, cinds):
 
-    t1 = time.time()
+    #t1 = time.time()
     # Obtain Lambda from theta
-    Lambda = mapping(theta, nlevels, nparams)
-    t2 = time.time()
+    Lambda = mapping(theta, tinds, rinds, cinds)
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     # Obtain Lambda'
     Lambdat = spmatrix.trans(Lambda)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     LambdatZtY = Lambdat*ZtY
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     LambdatZtX = Lambdat*ZtX
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     # Set the factorisation to use LL' instead of LDL'
     cholmod.options['supernodal']=2
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain L
-    t1 = time.time()
+    #t1 = time.time()
     LambdatZtZLambda = Lambdat*ZtZ*Lambda
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     I = spmatrix(1.0, range(Lambda.size[0]), range(Lambda.size[0]))
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     L = chol_dict['L']
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     F = chol_dict['F']
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain C_u (annoyingly solve writes over the second argument,
     # whereas spsolve outputs)
-    t1 = time.time()
+    #t1 = time.time()
     Cu = LambdatZtY[P,:]
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     cholmod.solve(F,Cu,sys=4)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain RZX
-    t1 = time.time()
+    #t1 = time.time()
     RZX = LambdatZtX[P,:]
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     cholmod.solve(F,RZX,sys=4)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain RXtRX
-    t1 = time.time()
+    #t1 = time.time()
     RXtRX = XtX - matrix.trans(RZX)*RZX
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     #print(RXtRX.size)
@@ -367,61 +372,55 @@ def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z, P, nlevels, nparams):
 
     # Obtain beta estimates (note: gesv also replaces the second
     # argument)
-    t1 = time.time()
+    #t1 = time.time()
     betahat = XtY - matrix.trans(RZX)*Cu
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
     
-    t1 = time.time()
+    #t1 = time.time()
     lapack.gesv(RXtRX, betahat)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain u estimates
-    t1 = time.time()
+    #t1 = time.time()
     uhat = Cu-RZX*betahat
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     cholmod.solve(F,uhat,sys=5)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    t1 = time.time()
+    #t1 = time.time()
     cholmod.solve(F,uhat,sys=8)
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain b estimates
-    t1 = time.time()
+    #t1 = time.time()
     bhat = Lambda*uhat
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
-    # Obtain y estimates
-    t1 = time.time()
-    Yhat = X*betahat + Z*bhat
-    t2 = time.time()
-    #print(t2-t1)
-
-    # Obtain residuals
-    t1 = time.time()
-    res = Y - Yhat
-    t2 = time.time()
+    # Obtain residuals sum of squares
+    #t1 = time.time()
+    resss = YtY-2*YtX*betahat-2*YtZ*bhat+2*matrix.trans(betahat)*XtZ*bhat+matrix.trans(betahat)*XtX*betahat+matrix.trans(bhat)*ZtZ*bhat
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain penalised residual sum of squares
-    t1 = time.time()
-    pss = matrix.trans(res)*res + matrix.trans(uhat)*uhat
-    t2 = time.time()
+    #t1 = time.time()
+    pss = resss + matrix.trans(uhat)*uhat
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain Log(|L|^2)
-    t1 = time.time()
+    #t1 = time.time()
     logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # this method only works for symm decomps
     # Need to do tr(R_X)^2 for rml
-    t2 = time.time()
+    #t2 = time.time()
     #print(t2-t1)
 
     # Obtain log likelihood
@@ -438,7 +437,7 @@ def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z, P, nlevels, nparams):
 nparams = np.array([9,6,12,3,2,1])
 nlevels = np.array([10,3,9,3,2,6])
 theta = np.random.randn((np.sum(np.multiply(nparams,(nparams+1))/2)).astype(np.int64))
-l=mapping(theta, nlevels, nparams)
+#l=get_mapping(theta, nlevels, nparams)
 #print(inv_mapping(l)==theta)
 
 # Go to test data directory
@@ -470,8 +469,9 @@ theta = inv_mapping(f['L'])
 
 nlevels = np.array([20,3])
 nparams = np.array([2,2])
-Lam=mapping(theta, nlevels, nparams)
-cvxopt.printing.options['width'] = -1
+tinds,rinds,cinds=get_mapping(theta, nlevels, nparams)
+Lam=mapping(theta,tinds,rinds,cinds)
+#cvxopt.printing.options['width'] = -1
 
 # Obtaining permutation for PLS
 # Obtain Lambda'Z'ZLambda
@@ -489,13 +489,20 @@ ZtY=cvxopt.spmatrix.trans(Z)*Y
 XtX=cvxopt.matrix.trans(X)*X
 ZtZ=cvxopt.spmatrix.trans(Z)*Z
 XtY=cvxopt.matrix.trans(X)*Y
+YtX=cvxopt.matrix.trans(Y)*X
+YtZ=cvxopt.matrix.trans(Y)*Z
+XtZ=cvxopt.matrix.trans(X)*Z
+YtY=cvxopt.matrix.trans(Y)*Y
+
+tinds, rinds, cinds = get_mapping(theta, nlevels, nparams)
+
 t1 = time.time()
-estllh =-PLS(theta,ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z,P,nlevels,nparams)
+estllh =-PLS(theta,ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY,P,tinds, rinds, cinds)
 t2 = time.time()
 
 truellh=matrix(pd.read_csv('./estd_ll.csv',header=None).values)[0]
 
-print(t2-t1)
+#print(t2-t1)
 
 # Determinant check
 V = [10, 3, 5, -2, 5, 8,3,-2,3,3]
@@ -511,14 +518,14 @@ A2[I,J]=V
 theta0=np.array([1,0,1,1,0,1])
 
 t1 = time.time()
-theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z,P,nlevels,nparams), method='Nelder-Mead', tol=1e-6)
+#theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY ,P,nlevels,nparams), method='Nelder-Mead', tol=1e-6)
 t2 = time.time()
 
-print(t2-t1)
+#print(t2-t1)
 
 
 t1 = time.time()
-theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, Y, X, Z,P,nlevels,nparams), method='Powell', tol=1e-6)
+theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY ,P,tinds, rinds, cinds), method='Powell', tol=1e-6)
 t2 = time.time()
 
 print(t2-t1)
