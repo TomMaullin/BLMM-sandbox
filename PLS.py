@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 import os
 import time
 import numba
-import sparse #All functions but the chol should be converted to use this
+#import sparse #All functions but the chol should be converted to use this
 
 # Mapping function
 # ----------------------------------------------
@@ -301,7 +301,7 @@ def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY, P, tinds, rinds, cin
     LambdatZtX = Lambdat*ZtX
     #t2 = time.time()
     #print(t2-t1)
-
+    
     #t1 = time.time()
     # Set the factorisation to use LL' instead of LDL'
     cholmod.options['supernodal']=2
@@ -320,12 +320,7 @@ def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY, P, tinds, rinds, cin
     #print(t2-t1)
 
     #t1 = time.time()
-    chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True)
-    #t2 = time.time()
-    #print(t2-t1)
-
-    #t1 = time.time()
-    L = chol_dict['L']
+    chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True, retP=False, retL=False)
     #t2 = time.time()
     #print(t2-t1)
 
@@ -378,7 +373,7 @@ def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY, P, tinds, rinds, cin
     #print(t2-t1)
     
     #t1 = time.time()
-    lapack.gesv(RXtRX, betahat)
+    lapack.posv(RXtRX, betahat)
     #t2 = time.time()
     #print(t2-t1)
 
@@ -431,7 +426,160 @@ def PLS(theta, ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY, P, tinds, rinds, cin
     #print(theta)
 
     return(-logllh[0,0])
-    
+
+##def PLSneighbour(theta, betan, ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY, P, tinds, rinds, cinds):
+##
+##    # Neighbour changes
+##    XtX=XtX+ spmatrix(1.0, range(3), range(3))
+##    XtY = XtY + betan
+##    YtX = YtX + matrix.trans(betan)
+##
+##    #t1 = time.time()
+##    # Obtain Lambda from theta
+##    Lambda = mapping(theta, tinds, rinds, cinds)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    # Obtain Lambda'
+##    Lambdat = spmatrix.trans(Lambda)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    LambdatZtY = Lambdat*ZtY
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    LambdatZtX = Lambdat*ZtX
+##    #t2 = time.time()
+##    #print(t2-t1)
+##    
+##    #t1 = time.time()
+##    # Set the factorisation to use LL' instead of LDL'
+##    cholmod.options['supernodal']=2
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain L
+##    #t1 = time.time()
+##    LambdatZtZLambda = Lambdat*ZtZ*Lambda
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    I = spmatrix(1.0, range(Lambda.size[0]), range(Lambda.size[0]))
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    chol_dict = sparse_chol(LambdatZtZLambda+I, perm=P, retF=True, retL=False)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    F = chol_dict['F']
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain C_u (annoyingly solve writes over the second argument,
+##    # whereas spsolve outputs)
+##    #t1 = time.time()
+##    Cu = LambdatZtY[P,:]
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    cholmod.solve(F,Cu,sys=4)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain RZX
+##    #t1 = time.time()
+##    RZX = LambdatZtX[P,:]
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    cholmod.solve(F,RZX,sys=4)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain RXtRX
+##    #t1 = time.time()
+##    RXtRX = XtX - matrix.trans(RZX)*RZX
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #print(RXtRX.size)
+##    #print(X.size)
+##    #print(Y.size)
+##    #print(RZX.size)
+##    #print(Cu.size)
+##    
+##
+##    # Obtain beta estimates (note: gesv also replaces the second
+##    # argument)
+##    #t1 = time.time()
+##    betahat = XtY - matrix.trans(RZX)*Cu
+##    #t2 = time.time()
+##    #print(t2-t1)
+##    
+##    #t1 = time.time()
+##    lapack.gesv(RXtRX, betahat)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain u estimates
+##    #t1 = time.time()
+##    uhat = Cu-RZX*betahat
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    cholmod.solve(F,uhat,sys=5)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    #t1 = time.time()
+##    cholmod.solve(F,uhat,sys=8)
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain b estimates
+##    #t1 = time.time()
+##    bhat = Lambda*uhat
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain residuals sum of squares
+##    #t1 = time.time()
+##    resss = YtY-2*YtX*betahat-2*YtZ*bhat+2*matrix.trans(betahat)*XtZ*bhat+matrix.trans(betahat)*XtX*betahat+matrix.trans(bhat)*ZtZ*bhat
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain penalised residual sum of squares
+##    #t1 = time.time()
+##    pss = resss + matrix.trans(uhat)*uhat
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain Log(|L|^2)
+##    #t1 = time.time()
+##    logdet = 2*sum(cvxopt.log(cholmod.diag(F))) # this method only works for symm decomps
+##    # Need to do tr(R_X)^2 for rml
+##    #t2 = time.time()
+##    #print(t2-t1)
+##
+##    # Obtain log likelihood
+##    logllh = -logdet/2-X.size[0]/2*(1+np.log(2*np.pi*pss)-np.log(X.size[0]))
+##
+##    #print(L[::(L.size[0]+1)]) # gives diag
+##    #print(logllh[0,0])
+##    #print(theta)
+##
+##    return(-logllh[0,0])
 
 # Examples
 nparams = np.array([9,6,12,3,2,1])
@@ -441,7 +589,7 @@ theta = np.random.randn((np.sum(np.multiply(nparams,(nparams+1))/2)).astype(np.i
 #print(inv_mapping(l)==theta)
 
 # Go to test data directory
-os.chdir('/home/tommaullin/Documents/BLMM-sandbox/testdata')
+os.chdir('/home/tommaullin/BLMM-sandbox/testdata')
 
 # Read in random effects variances
 Z_3col=pd.read_csv('Z_3col.csv',header=None).values
@@ -515,17 +663,41 @@ A2[I,J]=V
 #print(sp_det_sym(A))
 #print(logdet)
 
+#Y2=Y+cvxopt.normal(1000,1)/10
+
+
+#ZtY2=cvxopt.spmatrix.trans(Z)*Y2
+#XtY2=cvxopt.matrix.trans(X)*Y2
+#Y2tX=cvxopt.matrix.trans(Y2)*X
+#Y2tZ=cvxopt.matrix.trans(Y2)*Z
+#Y2tY2=cvxopt.matrix.trans(Y2)*Y2
+
 theta0=np.array([1,0,1,1,0,1])
 
-t1 = time.time()
+#t1 = time.time()
 #theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY ,P,nlevels,nparams), method='Nelder-Mead', tol=1e-6)
-t2 = time.time()
+#t2 = time.time()
+
+#beta1 = matrix(pd.read_csv('./true_beta.csv',header=None).values)
+#beta2 = beta1
 
 #print(t2-t1)
+#true_b=matrix(pd.read_csv('./true_b.csv',header=None).values)
+#Y3 = X*beta2+Z*(true_b+cvxopt.normal(46,1))+cvxopt.normal(1000,1)
 
+#ZtY3=cvxopt.spmatrix.trans(Z)*Y3
+#XtY3=cvxopt.matrix.trans(X)*Y3
+#Y3tX=cvxopt.matrix.trans(Y3)*X
+#Y3tZ=cvxopt.matrix.trans(Y3)*Z
+#Y3tY3=cvxopt.matrix.trans(Y3)*Y3
+
+#betan = matrix(pd.read_csv('./estd_beta.csv',header=None).values)
 
 t1 = time.time()
-theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY ,P,tinds, rinds, cinds), method='Powell', tol=1e-6)
+theta_est=minimize(PLS, theta0, args=(ZtX, ZtY, XtX, ZtZ, XtY, YtX, YtZ, XtZ, YtY ,P,tinds, rinds, cinds), method='Powell', tol=1e-6).x
+#theta_est2=minimize(PLS, theta_est, args=(ZtX, ZtY2, XtX, ZtZ, XtY2, Y2tX, Y2tZ, XtZ, Y2tY2 ,P,tinds, rinds, cinds), method='Powell', tol=1e-6).x
+#theta_est3=minimize(PLSneighbour, theta0, args=(betan, ZtX, ZtY3, XtX, ZtZ, XtY3, Y3tX, Y3tZ, XtZ, Y3tY3 ,P,tinds, rinds, cinds), method='Powell', tol=1e-6).x
 t2 = time.time()
+
 
 print(t2-t1)
