@@ -56,7 +56,7 @@ x3 <- as.matrix(X[,3])
 z1 <- as.matrix(XS[,1])
 z2 <- as.matrix(XS[,2])
 
-m <- lmer(y ~ x2 + x3 + (z2|fS)) #Don't need intercepts in R - automatically assumed
+m <- lmer(y ~ x2 + x3 + (z2|fS), REML=FALSE) #Don't need intercepts in R - automatically assumed
 
 # FFX estimates
 fixef(m)
@@ -71,4 +71,56 @@ as.matrix(Matrix::bdiag(VarCorr(m)))
 print(cov_s)
 
 summary(m)
+
+setwd('C:/Users/TomM/Documents/BLMM-testdata')
+
+# 3 column format for Z
+Z_3col<-as.data.frame(summary(Z))
+colnames(Z_3col) <- NULL
+write.csv(Z_3col,file="./Z_3col_1factor.csv",row.names=FALSE)
+
+sigma_3col<-as.data.frame(summary(sigma))
+colnames(sigma_3col) <- NULL
+write.csv(sigma_3col,file="./true_rfxvar_3col_1factor.csv",row.names=FALSE)
+
+X <- as.data.frame(X)
+colnames(X)<-NULL
+write.csv(X,file="./X_1factor.csv",row.names=FALSE)
+
+y <- as.data.frame(y)
+colnames(y)<-NULL
+write.csv(y,file="./Y_1factor.csv",row.names=FALSE)
+
+beta <- as.data.frame(beta)
+colnames(beta)<-NULL
+write.csv(beta,file="./true_beta_1factor.csv",row.names=FALSE)
+
+
+true_rfx <- data.frame(b)
+colnames(true_rfx) <- NULL
+write.csv(true_rfx,file="./true_b_1factor.csv",row.names=FALSE)
+
+true_ffxvar <- data.frame(c(1))
+colnames(true_ffxvar) <- NULL
+write.csv(true_ffxvar,file="./true_ffxvar_1factor.csv",row.names=FALSE)
+
+# Save the estimates as well
+rfx_1<-ranef(m)$fS
+colnames(rfx_1) <- ''
+est_rfx <- rfx_1
+colnames(est_rfx) <- NULL
+write.csv(est_rfx,file="./estd_b_1factor.csv",row.names=FALSE)
+
+rfxvar_est <- data.frame(as.matrix(Matrix::bdiag(VarCorr(m))))
+colnames(rfxvar_est) <- NULL
+write.csv(rfxvar_est,file="./estd_rfxvar_1factor.csv",row.names=FALSE)
+
+est_ffx <- data.frame(fixef(m))
+colnames(est_ffx) <- NULL
+write.csv(est_ffx,file="./estd_beta_1factor.csv",row.names=FALSE)
+
+est_ll <- data.frame(logLik(m))
+colnames(est_ll) <- NULL
+write.csv(est_ll,file="./estd_ll_1factor.csv",row.names=FALSE)
+
 
